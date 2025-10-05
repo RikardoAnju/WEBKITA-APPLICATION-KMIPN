@@ -7,136 +7,169 @@ import (
 	"BackendFramework/internal/database"
 	"BackendFramework/internal/model"
 	"BackendFramework/internal/utils"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/gomail.v2"
 )
 
+// AuthService adalah struktur layanan untuk menangani logika otentikasi.
 type AuthService struct {
-    db *sql.DB
+	db *sql.DB
 }
 
+// NewAuthService membuat instance baru dari AuthService.
 func NewAuthService() *AuthService {
-    return &AuthService{
-        db: database.DbAuth, 
-    }
+	return &AuthService{
+		db: database.DbAuth, 
+	}
 }
 
-// Register creates a new user account
+
+func (s *AuthService) VerifyEmail(token string) error {
+	query := "UPDATE users SET email_verified = true, verification_token = '' WHERE verification_token = ?"
+	result, err := s.db.Exec(query, token)
+	if err != nil {
+		return errors.New("gagal melakukan verifikasi email di database")
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return errors.New("token tidak valid atau sudah dipakai")
+	}
+	return nil
+}
+
+func SendVerificationEmail(to, token string) error {
+    cfg := utils.LoadSMTPConfig() 
+
+    m := gomail.NewMessage()
+    m.SetHeader("From", cfg.SenderName)
+    m.SetHeader("To", to)
+    m.SetHeader("Subject", "Verifikasi Email Anda")
+
+    verifyURL := "http://localhost:8080/verify?token=" + token
+    m.SetBody("text/html", "Klik tautan berikut untuk verifikasi akun Anda: <a href='"+verifyURL+"'>Verifikasi Akun</a>")
+
+    d := gomail.NewDialer(cfg.Host, 587, cfg.AuthEmail, cfg.AuthPass)
+    return d.DialAndSend(m)
+}
+
+
+
+func generateVerificationToken() string {
+	return uuid.New().String()
+}
+
+
+
+// Register mendaftarkan pengguna baru ke database.
 func (s *AuthService) Register(req model.RegisterRequest) (*model.UserResponse, error) {
-	// Check if username already exists
-	if err := s.checkUsernameExists(req.Username); err != nil {
-		return nil, err
-	}
-
-	// Check if email already exists
-	if err := s.checkEmailExists(req.Email); err != nil {
-		return nil, err
-	}
-
-	// Check if phone already exists
-	if err := s.checkPhoneExists(req.Phone); err != nil {
-		return nil, err
-	}
-
-	// Validate group exists
-	if err := s.validateGroupExists(req.Group); err != nil {
+	// Cek apakah email sudah terdaftar
+	if err := s.cekEmailAda(req.Email); err != nil {
 		return nil, err
 	}
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, errors.New("gagal enkripsi password")
+		return nil, errors.New("gagal mengenkripsi kata sandi")
 	}
 
-	// Insert user into database
-	query := `
-		INSERT INTO users (username, first_name, last_name, email, phone, password, group_id, is_aktif, subscribe_newsletter, email_verified, phone_verified, created_at, updated_at) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	
+	// Generate token verifikasi
+	token := generateVerificationToken()
+
 	now := time.Now()
-	result, err := s.db.Exec(query, 
-		req.Username, 
-		req.FirstName, 
-		req.LastName, 
-		req.Email, 
-		req.Phone, 
-		string(hashedPassword), 
-		req.Group, 
-		"Y", 
-		req.SubscribeNewsletter, 
+
+	query := `
+		INSERT INTO users (username, email, password, group_id, is_aktif, subscribe_newsletter, 
+						   email_verified, verification_token, created_at, updated_at) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	result, err := s.db.Exec(query,
+		req.Email,             
+		req.Email,
+		string(hashedPassword),
+		1,     
+		"Y",   
 		false, 
 		false, 
-		now, 
-		now)
-	
+		token, 
+		now,
+		now,
+	)
 	if err != nil {
-		return nil, errors.New("gagal membuat akun")
+		return nil, errors.New("gagal membuat akun pengguna")
 	}
 
-	userID, err := result.LastInsertId()
-	if err != nil {
-		return nil, errors.New("gagal mendapatkan ID user")
-	}
+	userID, _ := result.LastInsertId()
 
-	// Get created user with group info
-	user, err := s.getUserByID(uint(userID))
-	if err != nil {
-		return nil, errors.New("gagal mengambil data user yang baru dibuat")
-	}
+	// Kirim email verifikasi secara asynchronous
+	go SendVerificationEmail(req.Email, token)
 
-	response := user.ToResponse()
+	user, _ := s.getUserBerdasarkanID(uint(userID))
+	response := user.ToResponse() // Asumsi ToResponse() ada di model.User
 	return &response, nil
 }
 
-// Login authenticates user by email
+// Login mengotentikasi pengguna berdasarkan email.
 func (s *AuthService) Login(req model.LoginRequest) (*model.UserResponse, string, error) {
-	// Find user by email
-	user, err := s.findActiveUserByEmail(req.Email)
+	// Cari pengguna aktif berdasarkan email
+	user, err := s.cariUserAktifBerdasarkanEmail(req.Email)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Check password
+	// Periksa password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, "", errors.New("email atau password salah")
+		return nil, "", errors.New("email atau kata sandi salah")
 	}
 
-	// Generate JWT token
-	token, err := utils.GenerateJWT(user.ID, user.Email)
+	// Cek apakah email sudah diverifikasi
+	if !user.EmailVerified {
+		return nil, "", errors.New("akun belum diverifikasi. Silakan cek email Anda untuk tautan verifikasi")
+	}
+
+	// Generate token JWT
+	token, err := utils.GenerateJWT(user.ID, user.Email) // Asumsi GenerateJWT ada di package utils
 	if err != nil {
-		return nil, "", errors.New("gagal membuat token")
+		return nil, "", errors.New("gagal membuat token otentikasi")
 	}
 
 	response := user.ToResponse()
 	return &response, token, nil
 }
 
-// LoginWithUsername authenticates user by username
+// LoginWithUsername mengotentikasi pengguna berdasarkan username.
 func (s *AuthService) LoginWithUsername(req model.LoginWithUsernameRequest) (*model.UserResponse, string, error) {
-	// Find user by username
-	user, err := s.findActiveUserByUsername(req.Username)
+	// Cari pengguna aktif berdasarkan username
+	user, err := s.cariUserAktifBerdasarkanUsername(req.Username)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Check password
+	// Periksa password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, "", errors.New("username atau password salah")
+		return nil, "", errors.New("username atau kata sandi salah")
 	}
 
-	// Generate JWT token
+	// Cek apakah email sudah diverifikasi
+	if !user.EmailVerified {
+		return nil, "", errors.New("akun belum diverifikasi. Silakan cek email Anda untuk tautan verifikasi")
+	}
+
+	// Generate token JWT
 	token, err := utils.GenerateJWT(user.ID, user.Email)
 	if err != nil {
-		return nil, "", errors.New("gagal membuat token")
+		return nil, "", errors.New("gagal membuat token otentikasi")
 	}
 
 	response := user.ToResponse()
 	return &response, token, nil
 }
 
-// GetUserByID retrieves user by ID
+// GetUserByID mengambil data pengguna berdasarkan ID.
 func (s *AuthService) GetUserByID(userID interface{}) (*model.UserResponse, error) {
-	user, err := s.getUserByID(userID)
+	user, err := s.getUserBerdasarkanID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,18 +178,18 @@ func (s *AuthService) GetUserByID(userID interface{}) (*model.UserResponse, erro
 	return &response, nil
 }
 
-// GetOneUserByUsername retrieves user by username (for compatibility with existing controller)
+// GetOneUserByUsername mengambil data pengguna berdasarkan username (untuk kompatibilitas controller lama).
 func (s *AuthService) GetOneUserByUsername(username string) *model.User {
-	user, err := s.findActiveUserByUsername(username)
+	user, err := s.cariUserAktifBerdasarkanUsername(username)
 	if err != nil {
 		return nil
 	}
 	return user
 }
 
-// UpsertTokenData creates or updates token data
+// UpsertTokenData membuat atau memperbarui data token pengguna di tabel user_tokens.
 func (s *AuthService) UpsertTokenData(userID string, tokenData map[string]interface{}) bool {
-	// Check if token data exists
+	// Periksa apakah data token sudah ada untuk pengguna ini
 	var count int
 	checkQuery := "SELECT COUNT(*) FROM user_tokens WHERE user_id = ?"
 	err := s.db.QueryRow(checkQuery, userID).Scan(&count)
@@ -165,13 +198,13 @@ func (s *AuthService) UpsertTokenData(userID string, tokenData map[string]interf
 	}
 
 	now := time.Now()
-	
+
 	if count == 0 {
-		// Insert new token data
+		// Sisipkan data token baru
 		insertQuery := `
 			INSERT INTO user_tokens (user_id, last_ip_address, last_user_agent, access_token, refresh_token, refresh_token_expired, last_login, is_valid_token, is_remember_me, created_at, updated_at) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		
+
 		_, err = s.db.Exec(insertQuery,
 			userID,
 			tokenData["last_ip_address"],
@@ -185,13 +218,13 @@ func (s *AuthService) UpsertTokenData(userID string, tokenData map[string]interf
 			now,
 			now)
 	} else {
-		// Update existing token data
+		// Perbarui data token yang sudah ada
 		updateQuery := `
 			UPDATE user_tokens 
 			SET last_ip_address = ?, last_user_agent = ?, access_token = ?, refresh_token = ?, 
-			    refresh_token_expired = ?, last_login = ?, is_valid_token = ?, is_remember_me = ?, updated_at = ?
+				refresh_token_expired = ?, last_login = ?, is_valid_token = ?, is_remember_me = ?, updated_at = ?
 			WHERE user_id = ?`
-		
+
 		_, err = s.db.Exec(updateQuery,
 			tokenData["last_ip_address"],
 			tokenData["last_user_agent"],
@@ -204,18 +237,18 @@ func (s *AuthService) UpsertTokenData(userID string, tokenData map[string]interf
 			now,
 			userID)
 	}
-	
+
 	return err == nil
 }
 
-// GetTokenData retrieves token data based on filter
+// GetTokenData mengambil data token berdasarkan ID pengguna dan refresh token.
 func (s *AuthService) GetTokenData(userID, refreshToken string) map[string]interface{} {
 	query := `
 		SELECT user_id, last_ip_address, last_user_agent, access_token, refresh_token, 
-		       refresh_token_expired, last_login, is_valid_token, is_remember_me, created_at, updated_at
+			   refresh_token_expired, last_login, is_valid_token, is_remember_me, created_at, updated_at
 		FROM user_tokens 
-		WHERE user_id = ? AND refresh_token = ? AND is_valid_token = 'y'`
-	
+		WHERE user_id = ? AND refresh_token = ? AND is_valid_token = 'Y'` 
+
 	var tokenData map[string]interface{}
 	var lastIPAddress, lastUserAgent, accessToken, refreshTokenDB, isValidToken, isRememberMe sql.NullString
 	var refreshTokenExpired, lastLogin, createdAt, updatedAt sql.NullTime
@@ -224,14 +257,14 @@ func (s *AuthService) GetTokenData(userID, refreshToken string) map[string]inter
 	err := s.db.QueryRow(query, userID, refreshToken).Scan(
 		&userIDDB, &lastIPAddress, &lastUserAgent, &accessToken, &refreshTokenDB,
 		&refreshTokenExpired, &lastLogin, &isValidToken, &isRememberMe, &createdAt, &updatedAt)
-	
+
 	if err != nil {
 		return nil
 	}
 
 	tokenData = make(map[string]interface{})
 	tokenData["user_id"] = userIDDB
-	
+
 	if lastIPAddress.Valid {
 		tokenData["last_ip_address"] = lastIPAddress.String
 	}
@@ -266,25 +299,29 @@ func (s *AuthService) GetTokenData(userID, refreshToken string) map[string]inter
 	return tokenData
 }
 
-// DeleteTokenData removes token data for a user
+// DeleteTokenData menghapus data token untuk seorang pengguna.
 func (s *AuthService) DeleteTokenData(userID string) bool {
 	query := "DELETE FROM user_tokens WHERE user_id = ?"
 	_, err := s.db.Exec(query, userID)
 	return err == nil
 }
 
-// TestPing tests database connection
+// TestPing menguji koneksi ke database.
 func (s *AuthService) TestPing() error {
 	return s.db.Ping()
 }
 
-// Helper methods
-func (s *AuthService) checkUsernameExists(username string) error {
+// =========================================================================
+// FUNGSI PEMBANTU (HELPERS)
+// =========================================================================
+
+// cekUsernameAda memeriksa apakah username sudah terdaftar.
+func (s *AuthService) cekUsernameAda(username string) error {
 	var count int
 	query := "SELECT COUNT(*) FROM users WHERE username = ?"
 	err := s.db.QueryRow(query, username).Scan(&count)
 	if err != nil {
-		return errors.New("gagal mengecek username")
+		return errors.New("gagal mengecek ketersediaan username")
 	}
 	if count > 0 {
 		return errors.New("username sudah terdaftar")
@@ -292,12 +329,13 @@ func (s *AuthService) checkUsernameExists(username string) error {
 	return nil
 }
 
-func (s *AuthService) checkEmailExists(email string) error {
+// cekEmailAda memeriksa apakah email sudah terdaftar.
+func (s *AuthService) cekEmailAda(email string) error {
 	var count int
 	query := "SELECT COUNT(*) FROM users WHERE email = ?"
 	err := s.db.QueryRow(query, email).Scan(&count)
 	if err != nil {
-		return errors.New("gagal mengecek email")
+		return errors.New("gagal mengecek ketersediaan email")
 	}
 	if count > 0 {
 		return errors.New("email sudah terdaftar")
@@ -305,12 +343,13 @@ func (s *AuthService) checkEmailExists(email string) error {
 	return nil
 }
 
-func (s *AuthService) checkPhoneExists(phone string) error {
+// cekTeleponAda memeriksa apakah nomor telepon sudah terdaftar.
+func (s *AuthService) cekTeleponAda(phone string) error {
 	var count int
 	query := "SELECT COUNT(*) FROM users WHERE phone = ?"
 	err := s.db.QueryRow(query, phone).Scan(&count)
 	if err != nil {
-		return errors.New("gagal mengecek nomor telepon")
+		return errors.New("gagal mengecek ketersediaan nomor telepon")
 	}
 	if count > 0 {
 		return errors.New("nomor telepon sudah terdaftar")
@@ -318,7 +357,8 @@ func (s *AuthService) checkPhoneExists(phone string) error {
 	return nil
 }
 
-func (s *AuthService) validateGroupExists(groupID int) error {
+// validasiGrupAda memeriksa apakah group_id valid dan aktif.
+func (s *AuthService) validasiGrupAda(groupID int) error {
 	var count int
 	query := "SELECT COUNT(*) FROM groups WHERE id = ? AND is_active = true"
 	err := s.db.QueryRow(query, groupID).Scan(&count)
@@ -326,65 +366,74 @@ func (s *AuthService) validateGroupExists(groupID int) error {
 		return errors.New("gagal validasi grup")
 	}
 	if count == 0 {
-		return errors.New("grup tidak valid")
+		return errors.New("grup tidak valid atau tidak aktif")
 	}
 	return nil
 }
 
-func (s *AuthService) findActiveUserByEmail(email string) (*model.User, error) {
+// cariUserAktifBerdasarkanEmail mencari pengguna yang aktif berdasarkan email.
+func (s *AuthService) cariUserAktifBerdasarkanEmail(email string) (*model.User, error) {
 	query := `
 		SELECT u.id, u.username, u.first_name, u.last_name, u.email, u.phone, u.password, 
-		       u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
-		       u.subscribe_newsletter, u.created_at, u.updated_at
+			   u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
+			   u.subscribe_newsletter, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN groups g ON u.group_id = g.id
 		WHERE u.email = ? AND u.is_aktif = 'Y' AND u.deleted_at IS NULL`
-	
-	return s.scanUser(query, email)
+
+	return s.pindaiUser(query, email)
 }
 
-func (s *AuthService) findActiveUserByUsername(username string) (*model.User, error) {
+// cariUserAktifBerdasarkanUsername mencari pengguna yang aktif berdasarkan username.
+func (s *AuthService) cariUserAktifBerdasarkanUsername(username string) (*model.User, error) {
 	query := `
 		SELECT u.id, u.username, u.first_name, u.last_name, u.email, u.phone, u.password, 
-		       u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
-		       u.subscribe_newsletter, u.created_at, u.updated_at
+			   u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
+			   u.subscribe_newsletter, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN groups g ON u.group_id = g.id
 		WHERE u.username = ? AND u.is_aktif = 'Y' AND u.deleted_at IS NULL`
-	
-	return s.scanUser(query, username)
+
+	return s.pindaiUser(query, username)
 }
 
-func (s *AuthService) getUserByID(userID interface{}) (*model.User, error) {
+// getUserBerdasarkanID mengambil pengguna berdasarkan ID
+func (s *AuthService) getUserBerdasarkanID(userID interface{}) (*model.User, error) {
 	query := `
 		SELECT u.id, u.username, u.first_name, u.last_name, u.email, u.phone, u.password, 
-		       u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
-		       u.subscribe_newsletter, u.created_at, u.updated_at
+			   u.group_id, g.group_name, u.is_aktif, u.email_verified, u.phone_verified, 
+			   u.subscribe_newsletter, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN groups g ON u.group_id = g.id
 		WHERE u.id = ? AND u.deleted_at IS NULL`
-	
-	return s.scanUser(query, userID)
+
+	return s.pindaiUser(query, userID)
 }
 
-func (s *AuthService) scanUser(query string, args ...interface{}) (*model.User, error) {
+func (s *AuthService) pindaiUser(query string, args ...interface{}) (*model.User, error) {
 	var user model.User
 	var groupName sql.NullString
-	
+	var emailVerified, phoneVerified, subscribeNewsletter bool
+
 	err := s.db.QueryRow(query, args...).Scan(
-		&user.ID, &user.Username, &user.FirstName, &user.LastName, &user.Email, 
-		&user.Phone, &user.Password, &user.GroupID, &groupName, &user.IsAktif, 
-		&user.EmailVerified, &user.PhoneVerified, &user.SubscribeNewsletter, 
+		&user.ID, &user.Username, &user.FirstName, &user.LastName, &user.Email,
+		&user.Phone, &user.Password, &user.GroupID, &groupName, &user.IsAktif,
+		&emailVerified, &phoneVerified, &subscribeNewsletter, 
 		&user.CreatedAt, &user.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
-		return nil, errors.New("user tidak ditemukan")
+		return nil, errors.New("pengguna tidak ditemukan")
 	}
 	if err != nil {
-		return nil, errors.New("gagal mencari user")
+		// Sebaiknya lakukan logging error di sini
+		return nil, errors.New("gagal memuat data pengguna")
 	}
 
-	// Set group name
+	
+	user.EmailVerified = emailVerified
+	user.SubscribeNewsletter = subscribeNewsletter
+
+	// Set nama grup
 	if groupName.Valid {
 		user.GroupName = groupName.String
 		user.Group = model.Group{
@@ -396,34 +445,37 @@ func (s *AuthService) scanUser(query string, args ...interface{}) (*model.User, 
 	return &user, nil
 }
 
-// Package-level functions for backward compatibility with existing controller code
+// =========================================================================
+// FUNGSI LEVEL PACKAGE (KOMPATIBILITAS MUNDUR)
+// =========================================================================
+
 var defaultAuthService *AuthService
 
 func init() {
 	defaultAuthService = NewAuthService()
 }
 
-// GetOneUserByUsername - package level function for backward compatibility
+// GetOneUserByUsername - fungsi level package untuk kompatibilitas mundur.
 func GetOneUserByUsername(username string) *model.User {
 	return defaultAuthService.GetOneUserByUsername(username)
 }
 
-// UpsertTokenData - package level function for backward compatibility
+// UpsertTokenData - fungsi level package untuk kompatibilitas mundur.
 func UpsertTokenData(userID string, tokenData map[string]interface{}) bool {
 	return defaultAuthService.UpsertTokenData(userID, tokenData)
 }
 
-// GetTokenData - package level function for backward compatibility
+// GetTokenData - fungsi level package untuk kompatibilitas mundur.
 func GetTokenData(userID, refreshToken string) map[string]interface{} {
 	return defaultAuthService.GetTokenData(userID, refreshToken)
 }
 
-// DeleteTokenData - package level function for backward compatibility
+// DeleteTokenData - fungsi level package untuk kompatibilitas mundur.
 func DeleteTokenData(userID string) bool {
 	return defaultAuthService.DeleteTokenData(userID)
 }
 
-// TestPing - package level function for backward compatibility
+// TestPing - fungsi level package untuk kompatibilitas mundur.
 func TestPing() error {
 	return defaultAuthService.TestPing()
 }

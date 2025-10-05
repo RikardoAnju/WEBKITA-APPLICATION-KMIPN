@@ -1,6 +1,5 @@
 import React from "react";
-import Navbar from "../components/navbar";
-import Footer from "../components/Footer";
+
 import {
   Play,
   Globe,
@@ -15,6 +14,8 @@ import {
   CheckSquare,
 } from "lucide-react";
 
+// --- Konstanta ---
+
 const STEP_TYPES = {
   START: "start",
   PROCESS: "process",
@@ -23,7 +24,9 @@ const STEP_TYPES = {
   END: "end",
 };
 
-const CaraKerja = () => {
+// --- Komponen Utama ---
+
+const CaraKerja = ({ onBackToHome }) => {
   const stepsData = [
     {
       id: 1,
@@ -121,7 +124,6 @@ const CaraKerja = () => {
     },
   ];
 
-  // Helper function untuk menentukan warna icon berdasarkan tipe
   const getIconColor = (type) => {
     switch (type) {
       case STEP_TYPES.START:
@@ -137,7 +139,7 @@ const CaraKerja = () => {
     }
   };
 
-  // Komponen Card Langkah
+  // --- Komponen StepCard (Sub-Komponen) ---
   const StepCard = ({ step }) => {
     const Icon = step.icon;
     const iconStyle = getIconColor(step.type);
@@ -151,14 +153,14 @@ const CaraKerja = () => {
         <div className={`p-4 rounded-full inline-flex mb-4 ${iconStyle}`}>
           <Icon className="w-6 h-6" />
         </div>
-
+        
         {/* Content */}
         <h3 className="text-xl font-bold text-gray-900 mb-3">
           {step.id}. {step.title}
         </h3>
         <p className="text-gray-600">{step.description}</p>
-
-        {/* Tambahan untuk alur Keputusan dan Revisi */}
+        
+        {/* Tambahan untuk alur Keputusan */}
         {step.type === STEP_TYPES.DECISION && (
           <div className="mt-4 space-y-2 text-sm font-medium text-gray-700 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <p className="flex items-center">
@@ -171,6 +173,8 @@ const CaraKerja = () => {
             </p>
           </div>
         )}
+        
+        {/* Tambahan untuk alur Revisi */}
         {step.type === STEP_TYPES.REVISION && (
           <div className="mt-4 text-sm font-semibold p-4 bg-orange-50 rounded-lg border border-orange-200">
             <p className="text-orange-600 flex items-center">
@@ -184,40 +188,47 @@ const CaraKerja = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <Navbar />
-
-      <main className="flex-grow">
-        {/* Hero Section */}
-        <section className="bg-white py-16 lg:py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Header */}
-            <div className="text-center mb-12 lg:mb-16" data-aos="fade-up">
-              <div className="inline-block mb-4">
-                <span className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold">
-                  Proses Kerja Kami
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-                Cara Kerja Kami
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-                Langkah demi langkah dalam proses pengembangan website
-                profesional bersama Webkita.
-              </p>
+    <div className="bg-white">
+      {/* Konten Halaman Cara Kerja */}
+      <section className="py-16 lg:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Header */}
+          <div className="text-center mb-12 lg:mb-16" data-aos="fade-up">
+            <div className="inline-block mb-4">
+              <span className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold">
+                Proses Kerja Kami
+              </span>
             </div>
-
-            {/* Grid Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {stepsData.map((step) => (
-                <StepCard key={step.id} step={step} />
-              ))}
-            </div> 
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              Cara Kerja Kami
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+              Langkah demi langkah dalam proses pengembangan website
+              profesional bersama Webkita.
+            </p>
           </div>
-        </section>
-      </main>
+          
+          {/* Grid Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {stepsData.map((step) => (
+              <StepCard key={step.id} step={step} />
+            ))}
+          </div>
 
-      <Footer />
+          {/* Tombol kembali ke Beranda */}
+          {onBackToHome && (
+            <div className="text-center mt-12">
+              <button
+                onClick={onBackToHome}
+                className="bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition shadow-lg"
+              >
+                Kembali ke Beranda
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

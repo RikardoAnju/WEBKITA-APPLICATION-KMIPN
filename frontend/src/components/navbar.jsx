@@ -1,14 +1,13 @@
 import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
 
-export default function Navbar({ onLoginClick, onCaraKerjaClick, onNavigateHome, onNavigateHarga }) {
+export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick, onNavigateHome, onHargaClick }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Daftar link navigasi
+ 
   const navLinks = [
     { name: "Beranda", onClick: onNavigateHome || (() => window.location.href = "/") },
     { name: "Cara Kerja", onClick: onCaraKerjaClick || (() => {}) },
-    { name: "Harga", onClick: onNavigateHarga || (() => window.location.href = "/#harga") },
+    { name: "Harga", onClick: onHargaClick || (() => {}) },
   ];
 
   return (
@@ -34,12 +33,15 @@ export default function Navbar({ onLoginClick, onCaraKerjaClick, onNavigateHome,
               </button>
             ))}
             <button
-              onClick={onLoginClick || (() => {})}
+              onClick={onLoginClick || (() => window.location.href = "/login")}
               className="text-gray-700 hover:text-blue-600 transition font-medium px-6 py-2"
             >
               Masuk
             </button>
-            <button className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition">
+            <button
+              onClick={onRegisterClick || (() => window.location.href = "/register")}
+              className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition"
+            >
               Daftar
             </button>
           </div>
@@ -70,14 +72,28 @@ export default function Navbar({ onLoginClick, onCaraKerjaClick, onNavigateHome,
             ))}
             <button
               onClick={() => {
-                if (onLoginClick) onLoginClick();
+                if (onLoginClick) {
+                  onLoginClick();
+                } else {
+                  window.location.href = "/login";
+                }
                 setMobileMenuOpen(false);
               }}
               className="w-full text-gray-700 hover:text-blue-600 transition font-medium py-2 text-left"
             >
               Masuk
             </button>
-            <button className="w-full bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium">
+            <button
+              onClick={() => {
+                if (onRegisterClick) {
+                  onRegisterClick();
+                } else {
+                  window.location.href = "/register";
+                }
+                setMobileMenuOpen(false);
+              }}
+              className="w-full bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition"
+            >
               Daftar
             </button>
           </div>

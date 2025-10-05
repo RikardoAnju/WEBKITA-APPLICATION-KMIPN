@@ -13,7 +13,7 @@ import (
 var DbAuth *sql.DB
 
 func OpenAuth() {
-	// Buat DSN (Data Source Name)
+	
 	dsn := config.DB_AUTH_USERNAME + ":" +
 		config.DB_AUTH_PASSWORD + "@tcp(" +
 		config.DB_AUTH_HOSTNAME + ")/" +
