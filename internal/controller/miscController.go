@@ -17,6 +17,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Fungsi pembantu lokal untuk mengkonversi GroupID menjadi string yang dapat dibaca
+func getGroupNameFromID(groupID uint) string {
+	switch groupID {
+	case 1:
+		return "Admin"
+	case 2:
+		return "User"
+	default:
+		return "Unknown"
+	}
+}
+
 // TryGeneratePdf generates a PDF from HTML template
 func TryGeneratePdf(c *gin.Context) {
 	// Read HTML template
@@ -33,12 +45,12 @@ func TryGeneratePdf(c *gin.Context) {
 	// Prepare template data
 	year := time.Now().Year()
 	templateData := map[string]string{
-		"{{nama}}":         "Test User",
+		"{{nama}}":       "Test User",
 		"{{Opening_text}}": "Welcome to our system",
-		"{{keterangan}}":   "This is a test PDF generation",
-		"{{Year}}":         strconv.Itoa(year),
-		"{{Link}}":         "http://localhost:8080",
-		"{{Nama Sistem}}":  "Backend Framework",
+		"{{keterangan}}": "This is a test PDF generation",
+		"{{Year}}":       strconv.Itoa(year),
+		"{{Link}}":       "http://localhost:8080",
+		"{{Nama Sistem}}": "Backend Framework",
 	}
 
 	// Replace template variables
@@ -94,12 +106,12 @@ func SendMail(c *gin.Context) {
 
 	// Prepare template data
 	templateData := map[string]string{
-		"{{nama}}":         "Test User",
+		"{{nama}}":       "Test User",
 		"{{Opening_text}}": "Thank you for using our service",
-		"{{keterangan}}":   "This is a test email",
-		"{{Year}}":         strconv.Itoa(year),
-		"{{Link}}":         "http://localhost:8080",
-		"{{Nama Sistem}}":  "Backend Framework",
+		"{{keterangan}}": "This is a test email",
+		"{{Year}}":       strconv.Itoa(year),
+		"{{Link}}":       "http://localhost:8080",
+		"{{Nama Sistem}}": "Backend Framework",
 	}
 
 	// Replace template variables
@@ -159,20 +171,22 @@ func GenerateExcel(c *gin.Context) {
 	}
 
 	var excelData []map[string]interface{}
-    for _, user := range users {
-    status := "Inactive"
-    if user.IsAktif == "Y" { 
-        status = "Active"
-    }
+	for _, user := range users {
+		status := "Inactive"
+		if user.IsAktif == "Y" {
+			status = "Active"
+		}
 
-    excelData = append(excelData, map[string]interface{}{
-        "User":      user.Username,
-        "Email":     user.Email,
-        "Usergroup": user.GroupName,
-        "Status":    status,
-    })
-}
+		// UBAH: Menggunakan GroupID dari user dan mengkonversinya ke nama grup
+		groupName := getGroupNameFromID(user.GroupID)
 
+		excelData = append(excelData, map[string]interface{}{
+			"User":      user.Username,
+			"Email":     user.Email,
+			"Usergroup": groupName, // UBAH: Menggunakan groupName hasil konversi
+			"Status":    status,
+		})
+	}
 
 	// Generate timestamp for unique filename
 	timestamp := time.Now().Format("20060102_150405")
@@ -294,6 +308,9 @@ func ReadExcel(c *gin.Context) {
 		},
 	})
 }
+
+
+
 
 // PingMongo tests MongoDB connection
 func PingMongo(c *gin.Context) {

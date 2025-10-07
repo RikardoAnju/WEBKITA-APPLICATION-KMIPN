@@ -11,9 +11,6 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-// Perbaikan: Tambahkan prop onBackToHome yang dibutuhkan oleh parent component
-// Jika component ini hanya digunakan di route '/register', prop ini mungkin tidak diperlukan
-// Namun, karena di App.js komponen ini dipanggil dengan prop tersebut, kita tambahkan.
 function Register({ onBackToHome }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -28,7 +25,8 @@ function Register({ onBackToHome }) {
     phone: "",
     password: "",
     confirmPassword: "",
-    groupId: "1", // Nilai default untuk group
+    role: "pembeli", // Role fixed sebagai pembeli
+    groupID: 2,
     subscribeNewsletter: false,
     terms: false,
   });
@@ -39,13 +37,12 @@ function Register({ onBackToHome }) {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // Langsung hapus error ketika user mulai mengetik lagi
+
     if (error) setError("");
     if (success) setSuccess("");
   };
 
   const validateForm = () => {
-    // Pengecekan wajib diisi
     if (!formData.username.trim()) {
       setError("Username wajib diisi.");
       return false;
@@ -103,19 +100,21 @@ function Register({ onBackToHome }) {
         username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        group_id: parseInt(formData.groupId),
-        is_aktif: true,
-        first_name: formData.firstName.trim(),
-        last_name: formData.lastName.trim(),
-        phone: formData.phone.trim(),
+        confirmPassword: formData.confirmPassword,
+        role: "pembeli", // Role selalu pembeli
+        group_id: formData.groupID,
+        is_aktif: "Y",
+        first_name: formData.firstName.trim() || "",
+        last_name: formData.lastName.trim() || "",
+        phone: formData.phone.trim() || "",
         subscribe_newsletter: formData.subscribeNewsletter,
       };
 
-      // URL API
-      const response = await fetch("http://localhost:8080/api/v1/register", {
+      const response = await fetch("http://localhost:8080/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         body: JSON.stringify(registerData),
       });
@@ -127,7 +126,6 @@ function Register({ onBackToHome }) {
         result = await response.json();
       } else {
         const text = await response.text();
-        // Cek jika response.text kosong atau non-json tapi response.ok = true (biasanya success 204/200 OK)
         if (response.ok) {
           result = { message: "Registrasi berhasil!" };
         } else {
@@ -141,7 +139,6 @@ function Register({ onBackToHome }) {
             "Endpoint registrasi tidak ditemukan. Pastikan API berjalan dengan benar."
           );
         }
-        // Gunakan pesan error dari server jika ada, atau pesan default
         throw new Error(
           result.message || `Registrasi gagal (${response.status})`
         );
@@ -151,7 +148,6 @@ function Register({ onBackToHome }) {
         "Registrasi berhasil! Anda akan dialihkan ke halaman login..."
       );
 
-      // Bersihkan form data
       setFormData({
         username: "",
         firstName: "",
@@ -160,24 +156,20 @@ function Register({ onBackToHome }) {
         phone: "",
         password: "",
         confirmPassword: "",
-        groupId: "1",
+        role: "pembeli",
+        groupID: 2,
         subscribeNewsletter: false,
         terms: false,
       });
 
-      // Pindahkan ke halaman login setelah 2 detik
       setTimeout(() => {
-        // Gunakan onBackToHome (jika tersedia) untuk navigasi internal, atau window.location jika tidak.
         if (onBackToHome) {
-            onBackToHome();
-        } else {
-            window.location.href = "/login";
+          onBackToHome();
         }
       }, 2000);
     } catch (err) {
       setError(
-        err.message ||
-          "Terjadi kesalahan saat registrasi. Silakan coba lagi."
+        err.message || "Terjadi kesalahan saat registrasi. Silakan coba lagi."
       );
     } finally {
       setLoading(false);
@@ -188,7 +180,6 @@ function Register({ onBackToHome }) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
       <div className="max-w-2xl w-full space-y-8">
         <div>
-          {/* Menggunakan onBackToHome prop (jika ada) untuk navigasi yang lebih baik dalam React router/state */}
           <button
             onClick={onBackToHome}
             className="inline-flex items-center text-gray-600 hover:text-gray-900 transition"
@@ -201,12 +192,13 @@ function Register({ onBackToHome }) {
         <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Buat Akun Baru
+              Buat Akun Pembeli
             </h2>
-            <p className="text-gray-600">Lengkapi data diri Anda untuk mendaftar</p>
+            <p className="text-gray-600">
+              Lengkapi data diri Anda untuk mendaftar sebagai pembeli
+            </p>
           </div>
 
-          {/* Area Notifikasi Error */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
               <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
@@ -214,7 +206,6 @@ function Register({ onBackToHome }) {
             </div>
           )}
 
-          {/* Area Notifikasi Sukses */}
           {success && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start">
               <CheckCircle className="w-5 h-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
@@ -223,7 +214,6 @@ function Register({ onBackToHome }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username */}
             <div>
               <label
                 htmlFor="username"
@@ -249,7 +239,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* First Name & Last Name */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label
@@ -289,7 +278,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label
                 htmlFor="email"
@@ -315,7 +303,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Phone */}
             <div>
               <label
                 htmlFor="phone"
@@ -340,7 +327,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label
                 htmlFor="password"
@@ -378,7 +364,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label
                 htmlFor="confirmPassword"
@@ -416,7 +401,6 @@ function Register({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Newsletter Subscription */}
             <div className="flex items-center">
               <input
                 id="subscribeNewsletter"
@@ -435,19 +419,20 @@ function Register({ onBackToHome }) {
               </label>
             </div>
 
-            {/* Terms Agreement */}
             <div className="flex items-start">
               <input
                 id="terms"
                 name="terms"
                 type="checkbox"
-                // required // Biarkan validasi di 'validateForm' agar pesan error bisa dikustom
                 checked={formData.terms}
                 onChange={handleChange}
                 disabled={loading}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 disabled:cursor-not-allowed"
               />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
+              <label
+                htmlFor="terms"
+                className="ml-2 block text-sm text-gray-700"
+              >
                 Saya menyetujui{" "}
                 <a href="#" className="text-blue-600 hover:underline">
                   Syarat & Ketentuan
@@ -460,7 +445,6 @@ function Register({ onBackToHome }) {
               </label>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -496,13 +480,15 @@ function Register({ onBackToHome }) {
             </button>
           </form>
 
-          {/* Login Link */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-gray-600">
               Sudah punya akun?{" "}
-              {/* PERBAIKAN SINTAKSIS EROOR DISINI */}
               <a
-                href="/login"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onBackToHome) onBackToHome();
+                }}
                 className="text-blue-600 hover:text-blue-700 font-semibold transition"
               >
                 Masuk sekarang

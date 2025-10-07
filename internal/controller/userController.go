@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetUser mengambil satu user berdasarkan usrId atau semua user jika usrId kosong
 func GetUser(c *gin.Context) {
 	usrId := c.Param("usrId")
 
@@ -243,7 +242,7 @@ func HardDeleteUser(c *gin.Context) {
 	})
 }
 
-// RestoreUser mengembalikan user yang telah di-soft delete
+
 func RestoreUser(c *gin.Context) {
 	usrId := c.Param("usrId")
 	if usrId == "" {
@@ -273,9 +272,9 @@ func RestoreUser(c *gin.Context) {
 	})
 }
 
-// GetUserProfile mengambil profile user yang sedang login
+
 func GetUserProfile(c *gin.Context) {
-	// Get user data from context (set by authentication middleware)
+	
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{

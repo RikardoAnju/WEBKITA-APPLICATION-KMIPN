@@ -21,15 +21,16 @@ func validateStruct(s interface{}) error {
 
 func InputValidator(obj interface{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := c.ShouldBind(obj); err != nil {
-			// LogError(err, "Invalid JSON input")
-			c.JSON(http.StatusOK, gin.H{
-				"code" : http.StatusBadRequest,
-				"error": "Invalid input",
-			})
-			c.Abort()
-			return
-		}
+		if err := c.ShouldBindJSON(obj); err != nil {
+    fmt.Println("DEBUG JSON BIND ERROR:", err)
+    c.JSON(http.StatusBadRequest, gin.H{
+        "code":  http.StatusBadRequest,
+        "error": err.Error(),
+    })
+    c.Abort()
+    return
+}
+
 
 		if err := validateStruct(obj); err != nil {
 			// LogError(err, "Validation failed")

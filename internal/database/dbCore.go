@@ -28,7 +28,8 @@ func OpenWebkita() {
 		config.DB_WEBKITA_PASSWORD + "@tcp(" +
 		config.DB_WEBKITA_HOSTNAME + ")/" +
 		config.DB_WEBKITA_DBNAME +
-		"?charset=utf8mb4&parseTime=True&loc=Local"
+		"?charset=utf8mb4&parseTime=true&loc=Local"
+
 
 	// Log DSN dengan password tersembunyi
 	safeDSN := strings.Replace(dsn, config.DB_WEBKITA_PASSWORD, "****", 1)
