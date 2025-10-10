@@ -140,11 +140,12 @@ const Harga = ({ onBackToHome }) => {
 
   const pricingPlans = [
     {
+      isPopular: true,
       title: "Paket UMKM",
       description: "Solusi lengkap untuk UMKM berkembang online",
       price: "1.500.000",
       priceRange: "Rp 1.500.000 - Rp 3.000.000",
-      badge: "HEMAT",
+      badge: "HEMAT & TERLARIS",
       features: [
         "Gratis domain 1 tahun",
         "Gratis hosting 1 tahun",
@@ -153,22 +154,21 @@ const Harga = ({ onBackToHome }) => {
         "Training & edukasi untuk kelola website",
       ],
     },
-    {
-      isPopular: true,
-      title: "Paket UI/UX",
-      description: "Desain modern dengan optimasi SEO lanjutan",
-      price: "450.000",
-      priceRange: "Mulai dari Rp 450.000",
-      badge: "TERLARIS",
-      features: [
-        "Semi-custom responsive design",
-        "CMS (Content Management System)",
-        "Advanced SEO optimization",
-        "Basic e-commerce functionality",
-        "Analytics integration",
-        "Maintenance support 1 tahun",
-      ],
-    },
+      {
+        title: "Paket UI/UX",
+        description: "Desain modern dengan optimasi SEO lanjutan",
+        price: "450.000",
+        priceRange: "Mulai dari Rp 450.000",
+        badge: "TERLARIS",
+        features: [
+          "Semi-custom responsive design",
+          "CMS (Content Management System)",
+          "Advanced SEO optimization",
+          "Basic e-commerce functionality",
+          "Analytics integration",
+          "Maintenance support 1 tahun",
+        ],
+      },
     {
       title: "Paket Front End",
       description: "Website modern dengan animasi interaktif",
@@ -299,6 +299,7 @@ const Harga = ({ onBackToHome }) => {
           )}
         </div>
       </main>
+
 
       {/* Pricing Modal */}
       <PricingModal

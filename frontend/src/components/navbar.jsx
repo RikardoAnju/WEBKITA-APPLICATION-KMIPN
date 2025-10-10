@@ -1,13 +1,22 @@
 import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
 
-export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick, onNavigateHome, onHargaClick }) {
+const Navbar = ({ onLoginClick, onRegisterClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
- 
+
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      setMobileMenuOpen(false);
+    }
+  };
+
   const navLinks = [
-    { name: "Beranda", onClick: onNavigateHome || (() => window.location.href = "/") },
-    { name: "Cara Kerja", onClick: onCaraKerjaClick || (() => {}) },
-    { name: "Harga", onClick: onHargaClick || (() => {}) },
+    { name: "Beranda", sectionId: "hero" },
+    { name: "Cara Kerja", sectionId: "cara-kerja" },
+    { name: "Harga", sectionId: "budget-calculator" },
+    { name: "Pertanyaan", sectionId: "faq" },
   ];
 
   return (
@@ -16,9 +25,9 @@ export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick
         <div className="flex items-center justify-between">
           <div
             className="text-2xl font-bold text-gray-900 cursor-pointer"
-            onClick={onNavigateHome || (() => window.location.href = "/")}
+            onClick={() => scrollToSection("hero")}
           >
-            Webkita
+            WebKita
           </div>
 
           {/* Desktop Menu */}
@@ -26,20 +35,20 @@ export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick
             {navLinks.map((link) => (
               <button
                 key={link.name}
-                onClick={link.onClick}
+                onClick={() => scrollToSection(link.sectionId)}
                 className="text-gray-700 hover:text-blue-600 transition font-medium"
               >
                 {link.name}
               </button>
             ))}
-            <button
-              onClick={onLoginClick || (() => window.location.href = "/login")}
+            <button 
+              onClick={onLoginClick}
               className="text-gray-700 hover:text-blue-600 transition font-medium px-6 py-2"
             >
               Masuk
             </button>
-            <button
-              onClick={onRegisterClick || (() => window.location.href = "/register")}
+            <button 
+              onClick={onRegisterClick}
               className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition"
             >
               Daftar
@@ -51,7 +60,11 @@ export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick
             className="lg:hidden p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
           </button>
         </div>
 
@@ -61,35 +74,24 @@ export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick
             {navLinks.map((link) => (
               <button
                 key={link.name}
-                onClick={() => {
-                  link.onClick();
-                  setMobileMenuOpen(false);
-                }}
+                onClick={() => scrollToSection(link.sectionId)}
                 className="block w-full text-left text-gray-700 hover:text-blue-600 transition font-medium py-2"
               >
                 {link.name}
               </button>
             ))}
-            <button
+            <button 
               onClick={() => {
-                if (onLoginClick) {
-                  onLoginClick();
-                } else {
-                  window.location.href = "/login";
-                }
+                onLoginClick();
                 setMobileMenuOpen(false);
               }}
               className="w-full text-gray-700 hover:text-blue-600 transition font-medium py-2 text-left"
             >
               Masuk
             </button>
-            <button
+            <button 
               onClick={() => {
-                if (onRegisterClick) {
-                  onRegisterClick();
-                } else {
-                  window.location.href = "/register";
-                }
+                onRegisterClick();
                 setMobileMenuOpen(false);
               }}
               className="w-full bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition"
@@ -101,4 +103,6 @@ export default function Navbar({ onLoginClick, onRegisterClick, onCaraKerjaClick
       </div>
     </nav>
   );
-}
+};
+
+export default Navbar;
